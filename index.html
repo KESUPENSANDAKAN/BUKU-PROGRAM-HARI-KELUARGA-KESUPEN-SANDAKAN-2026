@@ -442,44 +442,67 @@ book.addEventListener('pointerup',end,{passive:false});
 book.addEventListener('pointercancel',end,{passive:false});
 
 // Double-tap zoom: 1x -> 2x -> 1x.
-// Keep this independent of swipe/navigation locking.
+// The zoom focal point follows the exact touch position.
 let lastTap=0,tapX=0,tapY=0;
+
 book.addEventListener('pointerup',e=>{
   if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;
-  if(gestureMoved){ gestureMoved=false; lastTap=0; return; }
+
+  if(gestureMoved){
+    gestureMoved=false;
+    lastTap=0;
+    return;
+  }
 
   const now=performance.now();
-  const dx=e.clientX-tapX,dy=e.clientY-tapY;
+  const dx=e.clientX-tapX;
+  const dy=e.clientY-tapY;
 
-  if(now-lastTap<320&&Math.hypot(dx,dy)<28){
+  if(now-lastTap<360&&Math.hypot(dx,dy)<35){
     lastTap=0;
 
-    const a=act(); if(!a)return;
+    const a=act();
+    if(!a)return;
 
-    // First double-tap: open at 2x around the tap point.
+    // Always calculate the focal point from the actual touch position.
+    setRect();
+    const mx=e.clientX-cr.left;
+    const my=e.clientY-cr.top;
+
     if(z<=1.01){
+      // 1x -> 2x
       if(!overlay.classList.contains('open'))open(a);
       setRect();
 
-      const q=cr;
-      const mx=e.clientX-q.left;
-      const my=e.clientY-q.top;
+      const fx=e.clientX-cr.left;
+      const fy=e.clientY-cr.top;
 
       z=2;
-      L=mx-(mx/cw)*cw*z;
-      T=my-(my/ch)*ch;
+      L=fx-(fx/cw)*(cw*z);
+      T=fy-(fy/ch)*(ch*z);
       clamp();
       draw();
       lock(true);
       gestureMoved=true;
-    }
-    // Second double-tap: return to the original 1x view.
-    else{
+    }else{
+      // 2x -> 1x
       z=1;
       L=0;
       T=0;
       draw();
-      close();
+
+      // Reset the zoom state, but keep the current touch gesture clean.
+      overlay.classList.remove('open');
+      zi.removeAttribute('src');
+      img=null;
+      idx=-1;
+      pinch=false;
+      pts.clear();
+      gestureMoved=false;
+      lock(false);
+      book.dataset.zoomed='0';
+      window.__kesupenNavLocked=false;
+      zi.style.transform='translate3d(0,0,0) scale(1)';
     }
 
     e.preventDefault();
