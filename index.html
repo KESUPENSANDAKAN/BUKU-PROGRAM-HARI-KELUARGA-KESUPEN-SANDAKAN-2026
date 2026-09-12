@@ -164,7 +164,7 @@ book.addEventListener('pointermove',e=>{
 });
 book.addEventListener('pointerup',e=>{
   if(e.pointerType!=='touch' || !e.isPrimary) return;
-  if(navigationLocked || gestureMoved) return;
+  if(navigationLocked || window.__kesupenNavLocked || gestureMoved) return;
   const dx=e.clientX-startX, dy=e.clientY-startY;
   if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)) show(current+(dx<0?1:-1));
 });
@@ -451,6 +451,63 @@ window.addEventListener('load',()=>{
   });
 
   window.addEventListener('resize',()=>{ if(zoom===1) resetImage(); });
+})();
+</script>
+<script id="gesture-guard-final">
+(function(){
+  const book=document.getElementById('book');
+  if(!book) return;
+  let activeZoomed=false;
+  let touchCount=0;
+  let lockedGesture=false;
+  function page11(){ const a=book.querySelector('.page.active'); return a && [...book.querySelectorAll('.page')].indexOf(a)===10; }
+  function zoomed(){ return activeZoomed; }
+  // Keep the navigation layer informed BEFORE its bubble listeners run.
+  book.addEventListener('pointerdown', function(e){
+    if(e.pointerType!=='touch' || page11()) return;
+    touchCount++;
+    const active=book.querySelector('.page.active');
+    if(!active) return;
+    const idx=[...book.querySelectorAll('.page')].indexOf(active);
+    if(idx===10) return;
+    if(activeZoomed || touchCount>=2){
+      lockedGesture=true;
+      window.__kesupenNavLocked=true;
+      e.preventDefault();
+    }
+  }, true);
+  book.addEventListener('pointermove', function(e){
+    if(e.pointerType!=='touch' || page11()) return;
+    if(lockedGesture || touchCount>=2){
+      window.__kesupenNavLocked=true;
+      e.preventDefault();
+    }
+  }, true);
+  book.addEventListener('pointerup', function(e){
+    if(e.pointerType!=='touch' || page11()) return;
+    if(lockedGesture || touchCount>=2){
+      e.preventDefault();
+    }
+    touchCount=Math.max(0,touchCount-1);
+    if(touchCount===0){ lockedGesture=false; window.__kesupenNavLocked=false; }
+  }, true);
+  book.addEventListener('pointercancel', function(e){
+    if(e.pointerType!=='touch') return;
+    touchCount=Math.max(0,touchCount-1);
+    if(touchCount===0){ lockedGesture=false; window.__kesupenNavLocked=false; }
+  }, true);
+  // Track zoom state without interfering with Page 11.
+  const obs=new MutationObserver(function(){
+    const a=book.querySelector('.page.active');
+    const idx=a ? [...book.querySelectorAll('.page')].indexOf(a) : -1;
+    activeZoomed=idx!==10 && !!a && getComputedStyle(a).transform!=='none' && getComputedStyle(a).transform!=='matrix(1, 0, 0, 1, 0, 0)';
+  });
+  obs.observe(book,{subtree:true,attributes:true,attributeFilter:['style','class']});
+  // Also expose a safe lock for the existing navigation code.
+  const originalShow=window.show;
+  if(typeof originalShow==='function'){
+    window.show=function(i){ if(window.__kesupenNavLocked) return; return originalShow(i); };
+  }
 })();
 </script>
 </body>
