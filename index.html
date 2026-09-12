@@ -547,8 +547,25 @@ window.addEventListener('resize',()=>{
 
 new MutationObserver(()=>{
   const a=act();
-  if(!a){if(overlay.classList.contains('open'))close();return}
-  if(idx>=0&&a.idx!==idx)close();
+
+  // Any page change must always start at the original 1x view.
+  // Never allow the previous page's zoom state/transform to carry over.
+  if(idx>=0 && (!a || a.idx!==idx)){
+    close();
+    z=1;
+    L=0;
+    T=0;
+    pinch=false;
+    pts.clear();
+    gestureMoved=false;
+    book.dataset.zoomed='0';
+    window.__kesupenNavLocked=false;
+    lock(false);
+    zi.style.transform='translate3d(0,0,0) scale(1)';
+    return;
+  }
+
+  if(!a && overlay.classList.contains('open')) close();
 }).observe(book,{subtree:true,attributes:true,attributeFilter:['class']});
 })();
 </script>
