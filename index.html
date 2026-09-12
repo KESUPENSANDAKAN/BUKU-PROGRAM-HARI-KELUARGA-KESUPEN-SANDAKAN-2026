@@ -48,11 +48,12 @@ header{height:52px;flex-basis:52px;padding:0 9px}
 
 /* MASTER PINCH & ZOOM — Pages 1-10 and 12 only. Page 11 remains untouched. */
 .zooming-page {
+  transition: none !important;
   touch-action: none !important;
   user-select: none !important;
   -webkit-user-select: none !important;
 }
-.zooming-page img {
+.zooming-page {
   transform-origin: center center !important;
   will-change: transform;
 }
@@ -264,10 +265,16 @@ window.addEventListener('load',()=>{
     const imgs=[...book.querySelectorAll('img')];
     return imgs[i]||null;
   }
+  let raf=0;
   function apply(){
     if(!currentImg) return;
     currentImg.classList.add('zooming-page');
-    currentImg.style.transform=`translate3d(${tx}px,${ty}px,0) scale(${zoom})`;
+    if(raf) return;
+    raf=requestAnimationFrame(()=>{
+      raf=0;
+      if(!currentImg) return;
+      currentImg.style.transform=`translate3d(${tx}px,${ty}px,0) scale(${zoom})`;
+    });
   }
   function reset(){
     if(currentImg){currentImg.style.transform=''; currentImg.classList.remove('zooming-page');}
@@ -310,7 +317,7 @@ window.addEventListener('load',()=>{
   });
   // Keep in sync with page turns.
   new MutationObserver(()=>setTimeout(sync,20)).observe(book,{childList:true,subtree:true,attributes:true});
-  setInterval(sync,150);
+  setInterval(sync,500);
 })();
 </script>
 </body>
