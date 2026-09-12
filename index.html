@@ -227,7 +227,10 @@ book.addEventListener('pointerup',e=>{
   const idx=active ? [...book.querySelectorAll('.page')].indexOf(active) : current;
   // Page 11 keeps its existing Simple Zoom; normal swipe remains available.
   const dx=e.clientX-startX, dy=e.clientY-startY;
-  if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)) show(current+(dx<0?1:-1));
+  if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)){
+    window.__kesupenCancelDoubleTap?.();
+    show(current+(dx<0?1:-1));
+  }
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight') show(current+1);
@@ -493,12 +496,45 @@ book.addEventListener('pointerup',end,{passive:false});
 book.addEventListener('pointercancel',end,{passive:false});
 
 // Double-tap zoom: 1x -> 2x -> 1x.
-// Uses a dedicated tap detector so the second double-tap is not swallowed
-// by the generic gestureMoved state.
+// A swipe is NEVER allowed to be interpreted as a double-tap.
+// The tap detector tracks movement from pointerdown and cancels the
+// double-tap sequence whenever the finger actually swipes.
 let lastTap=0,tapX=0,tapY=0;
+let tapStartX=0,tapStartY=0,tapMoved=false;
+window.__kesupenCancelDoubleTap=function(){
+  lastTap=0;
+  tapMoved=false;
+};
+
+book.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;
+  tapStartX=e.clientX;
+  tapStartY=e.clientY;
+  tapMoved=false;
+},{capture:true,passive:true});
+
+book.addEventListener('pointermove',e=>{
+  if(e.pointerType!=='touch')return;
+  if(Math.hypot(e.clientX-tapStartX,e.clientY-tapStartY)>12){
+    tapMoved=true;
+    // Once movement starts, this touch cannot participate in a double-tap.
+    lastTap=0;
+  }
+},{capture:true,passive:true});
 
 book.addEventListener('pointerup',e=>{
   if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;
+
+  const movedThisTouch =
+    tapMoved ||
+    Math.hypot(e.clientX-tapStartX,e.clientY-tapStartY)>12;
+
+  // Any real swipe cancels the pending double-tap timer immediately.
+  if(movedThisTouch){
+    lastTap=0;
+    tapMoved=false;
+    return;
+  }
 
   const now=performance.now();
   const dx=e.clientX-tapX;
@@ -512,14 +548,12 @@ book.addEventListener('pointerup',e=>{
     return;
   }
 
-  // Consume this double-tap completely.
   lastTap=0;
 
   const a=act();
   if(!a)return;
 
   // Double-tap out: force a complete 1x reset.
-  // Do this before any generic gesture cleanup can interfere.
   if(z>1.01 || overlay.classList.contains('open')){
     z=1;
     L=0;
@@ -538,7 +572,6 @@ book.addEventListener('pointerup',e=>{
     book.dataset.zoomed='0';
     window.__kesupenNavLocked=false;
     lock(false);
-
     gestureMoved=false;
     draw();
 
@@ -547,7 +580,7 @@ book.addEventListener('pointerup',e=>{
     return;
   }
 
-  // Double-tap in: open at 2x and keep the touched point fixed.
+  // Double-tap in: 1x -> 2x, keeping the exact touched point as focus.
   if(!overlay.classList.contains('open'))open(a);
   setRect();
 
@@ -560,8 +593,6 @@ book.addEventListener('pointerup',e=>{
   clamp();
   draw();
   lock(true);
-
-  // Do not leave this flag set, otherwise the next double-tap can be blocked.
   gestureMoved=false;
 
   e.preventDefault();
