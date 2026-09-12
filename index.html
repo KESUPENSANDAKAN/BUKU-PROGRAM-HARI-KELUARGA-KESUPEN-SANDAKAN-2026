@@ -377,18 +377,17 @@ window.addEventListener('load',()=>{
       const d=dist(arr[0],arr[1]);
       const m=mid(arr[0],arr[1]);
       const nextZoom=Math.max(MIN,Math.min(MAX,startZoom*(d/startDist)));
-      // Keep the exact content point under the pinch midpoint fixed.
-      // With translate3d(...) scale(...), visual = content * zoom + translation.
-      // The page uses transform-origin:center center. Convert the screen
-      // pinch midpoint into coordinates relative to that center, then keep
-      // that exact content point under the moving pinch midpoint.
-      const cx=currentImg.getBoundingClientRect().left + currentImg.getBoundingClientRect().width/2;
-      const cy=currentImg.getBoundingClientRect().top + currentImg.getBoundingClientRect().height/2;
-      const focalX=(startMidX-cx-startTx)/Math.max(startZoom,0.0001);
-      const focalY=(startMidY-cy-startTy)/Math.max(startZoom,0.0001);
+
+      // Keep the exact content point that was under the initial pinch
+      // midpoint under the moving midpoint as zoom changes.
+      // Because the transform is translate(...) scale(...), tx/ty are
+      // screen-space translations; therefore the anchored content point is
+      // (startMid - startT) / startZoom.
+      const anchorX=(startMidX-startTx)/startZoom;
+      const anchorY=(startMidY-startTy)/startZoom;
       zoom=nextZoom;
-      tx=(m.x-cx)-(focalX*zoom);
-      ty=(m.y-cy)-(focalY*zoom);
+      tx=m.x-anchorX*zoom;
+      ty=m.y-anchorY*zoom;
       clampPan();
       draw();
       e.preventDefault();
@@ -454,9 +453,17 @@ window.addEventListener('load',()=>{
   book.addEventListener('dblclick',e=>{
     sync();
     if(!currentImg || e.target.closest('#qrLink')) return;
-    zoom=zoom>1.01?1:2;
-    if(zoom===1){tx=0;ty=0;navigationLocked=false;}
-    else { clampPan(); navigationLocked=true; currentImg.classList.add('zooming-page'); }
+    const nextZoom=zoom>1.01?1:2;
+    if(nextZoom===1){ zoom=1; tx=0; ty=0; navigationLocked=false; }
+    else {
+      const anchorX=(e.clientX-tx)/zoom;
+      const anchorY=(e.clientY-ty)/zoom;
+      zoom=nextZoom;
+      tx=e.clientX-anchorX*zoom;
+      ty=e.clientY-anchorY*zoom;
+      clampPan();
+      navigationLocked=true; currentImg.classList.add('zooming-page');
+    }
     draw();
     e.preventDefault();
   });
