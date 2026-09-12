@@ -274,8 +274,9 @@ new MutationObserver(()=>{const a=act();if(!a){if(overlay.classList.contains('op
  function is11(){const a=book.querySelector('.page.active');return a&&[...book.querySelectorAll('.page')].indexOf(a)===10;}
  book.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'||is11())return;count++; if(window.__kesupenNavLocked||book.dataset.zoomed==='1'||count>=2){active=true;window.__kesupenNavLocked=true;e.preventDefault();}},true);
  book.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'||is11())return;if(active||window.__kesupenNavLocked||book.dataset.zoomed==='1'||count>=2){active=true;window.__kesupenNavLocked=true;e.preventDefault();}},true);
- book.addEventListener('pointerup',e=>{if(e.pointerType!=='touch'||is11())return;if(active||book.dataset.zoomed==='1'){e.preventDefault();}count=Math.max(0,count-1);if(count===0&&!book.dataset.zoomed){active=false;window.__kesupenNavLocked=false;}},true);
+ book.addEventListener('pointerup',e=>{if(e.pointerType!=='touch'||is11())return;if(active||book.dataset.zoomed==='1'){e.preventDefault();}count=Math.max(0,count-1);setTimeout(()=>{if(count===0&&!book.dataset.zoomed){active=false;window.__kesupenNavLocked=false;}},0);},true);
  book.addEventListener('pointercancel',e=>{if(e.pointerType!=='touch')return;count=Math.max(0,count-1);if(count===0&&!book.dataset.zoomed){active=false;window.__kesupenNavLocked=false;}},true);
+  book.addEventListener('pointerup',e=>{if(e.pointerType==='touch'&&!book.dataset.zoomed&&count===0){active=false;window.__kesupenNavLocked=false;}},{passive:true});
 })();
 </script>
 </body>
