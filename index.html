@@ -149,8 +149,22 @@ navChoice.onclick=e=>{if(e.target===navChoice)navChoice.classList.add('hide');};
 
 
 let startX=0,startY=0;
-book.addEventListener('pointerdown',e=>{startX=e.clientX;startY=e.clientY;});
+let navigationLocked=false;
+let gestureMoved=false;
+book.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='touch' && e.isPrimary){
+    startX=e.clientX; startY=e.clientY;
+    gestureMoved=false;
+  }
+});
+book.addEventListener('pointermove',e=>{
+  if(e.pointerType==='touch' && e.isPrimary){
+    if(Math.abs(e.clientX-startX)>8 || Math.abs(e.clientY-startY)>8) gestureMoved=true;
+  }
+});
 book.addEventListener('pointerup',e=>{
+  if(e.pointerType!=='touch' || !e.isPrimary) return;
+  if(window.navigationLocked || gestureMoved) return;
   const dx=e.clientX-startX, dy=e.clientY-startY;
   if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)) show(current+(dx<0?1:-1));
 });
@@ -250,16 +264,17 @@ window.addEventListener('load',()=>{
   const MAX=3, MIN=1;
   let currentImg=null, currentIndex=-1;
   let zoom=1, tx=0, ty=0;
-  let p1=null, p2=null, pinch=false;
+  let points=new Map();
+  let pinch=false, gestureActive=false;
   let startDist=0, startZoom=1, startTx=0, startTy=0;
   let startMidX=0, startMidY=0;
-  let raf=0, pending=false;
+  let raf=0;
 
   function getActive(){
     const img=book.querySelector('.page.active');
     if(!img) return null;
     const idx=[...book.querySelectorAll('.page')].indexOf(img);
-    if(idx===10) return null; // Page 11 stays completely untouched.
+    if(idx===10) return null; // Page 11 remains untouched.
     return {img,idx};
   }
 
@@ -270,7 +285,8 @@ window.addEventListener('load',()=>{
     }
     currentImg=null; currentIndex=-1;
     zoom=1; tx=0; ty=0;
-    p1=p2=null; pinch=false;
+    points.clear(); pinch=false; gestureActive=false;
+    window.navigationLocked=false;
   }
 
   function sync(){
@@ -282,49 +298,48 @@ window.addEventListener('load',()=>{
     }
   }
 
-  function distance(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
-  function midpoint(a,b){return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}}
+  function dist(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
+  function mid(a,b){return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}}
 
   function draw(){
-    if(!currentImg || pending) return;
-    pending=true;
+    if(!currentImg || raf) return;
     raf=requestAnimationFrame(()=>{
-      pending=false;
-      if(!currentImg) return;
-      currentImg.style.transform=`translate3d(${tx}px,${ty}px,0) scale(${zoom})`;
+      raf=0;
+      if(currentImg) currentImg.style.transform=`translate3d(${tx}px,${ty}px,0) scale(${zoom})`;
     });
   }
 
   function beginPinch(a,b){
     sync();
     if(!currentImg) return;
-    pinch=true;
+    pinch=true; gestureActive=true; window.navigationLocked=true;
     currentImg.classList.add('zooming-page');
-    startDist=Math.max(1,distance(a,b));
-    startZoom=zoom;
-    startTx=tx; startTy=ty;
-    const m=midpoint(a,b); startMidX=m.x; startMidY=m.y;
+    startDist=Math.max(1,dist(a,b));
+    startZoom=zoom; startTx=tx; startTy=ty;
+    const m=mid(a,b); startMidX=m.x; startMidY=m.y;
   }
 
   book.addEventListener('pointerdown',e=>{
     if(e.pointerType==='mouse') return;
-    if(e.target.closest('#qrLink')) return;
-    if(e.pointerType==='touch'){
-      try{book.setPointerCapture(e.pointerId)}catch(_){ }
-      if(!p1) p1=e;
-      else if(!p2){ p2=e; beginPinch(p1,p2); e.preventDefault(); }
+    if(e.target.closest('#qrLink') || e.target.closest('button')) return;
+    sync();
+    points.set(e.pointerId,e);
+    if(points.size===2){
+      const arr=[...points.values()];
+      beginPinch(arr[0],arr[1]);
+      e.preventDefault();
     }
   },{passive:false});
 
   book.addEventListener('pointermove',e=>{
-    if(e.pointerType!=='touch' || !pinch) return;
-    if(p1 && p1.pointerId===e.pointerId) p1=e;
-    if(p2 && p2.pointerId===e.pointerId) p2=e;
-    if(!p1 || !p2 || !currentImg) return;
+    if(e.pointerType!=='touch' || !points.has(e.pointerId)) return;
+    points.set(e.pointerId,e);
+    if(!pinch || points.size<2 || !currentImg) return;
 
-    const d=distance(p1,p2);
+    const arr=[...points.values()];
+    const d=dist(arr[0],arr[1]);
+    const m=mid(arr[0],arr[1]);
     zoom=Math.max(MIN,Math.min(MAX,startZoom*(d/startDist)));
-    const m=midpoint(p1,p2);
     tx=startTx+(m.x-startMidX);
     ty=startTy+(m.y-startMidY);
     draw();
@@ -333,25 +348,48 @@ window.addEventListener('load',()=>{
 
   function endPointer(e){
     if(e.pointerType!=='touch') return;
-    if(p1 && p1.pointerId===e.pointerId) p1=null;
-    if(p2 && p2.pointerId===e.pointerId) p2=null;
-    if(pinch && (!p1 || !p2)){
-      pinch=false;
-      if(zoom<=1.01){zoom=1;tx=0;ty=0;draw();}
+    points.delete(e.pointerId);
+    if(pinch){
+      // Once a pinch starts, navigation stays locked until ALL touch points are released.
+      if(points.size===0){
+        pinch=false; gestureActive=false; window.navigationLocked=false;
+        if(zoom<=1.01){ zoom=1; tx=0; ty=0; draw(); }
+      }
+      e.preventDefault();
+      return;
+    }
+    if(points.size===0){
+      gestureActive=false;
+      window.navigationLocked=false;
     }
   }
   book.addEventListener('pointerup',endPointer,{passive:false});
   book.addEventListener('pointercancel',endPointer,{passive:false});
 
-  // Desktop wheel zoom. Ctrl is not required, so mouse-wheel works naturally.
+  // If zoomed, keep navigation locked so a finishing finger cannot turn the page.
+  book.addEventListener('touchstart',e=>{
+    if(e.touches.length>1){
+      window.navigationLocked=true;
+      e.preventDefault();
+    }
+  },{passive:false});
+  book.addEventListener('touchmove',e=>{
+    if(e.touches.length>1 || pinch || zoom>1.01) e.preventDefault();
+  },{passive:false});
+  book.addEventListener('touchend',()=>{
+    if(points.size===0 && !pinch) window.navigationLocked=false;
+  },{passive:false});
+
+  // Desktop wheel zoom.
   book.addEventListener('wheel',e=>{
     if(e.deltaY===0) return;
     sync();
     if(!currentImg) return;
     e.preventDefault();
+    window.navigationLocked=true;
     const factor=e.deltaY<0?1.10:0.91;
     zoom=Math.max(MIN,Math.min(MAX,zoom*factor));
-    if(zoom===1){tx=0;ty=0;}
+    if(zoom===1){tx=0;ty=0;window.navigationLocked=false;}
     currentImg.classList.add('zooming-page');
     draw();
   },{passive:false});
@@ -360,14 +398,12 @@ window.addEventListener('load',()=>{
     sync();
     if(!currentImg || e.target.closest('#qrLink')) return;
     zoom=zoom>1.01?1:2;
-    if(zoom===1){tx=0;ty=0;}
-    currentImg.classList.add('zooming-page');
+    if(zoom===1){tx=0;ty=0;window.navigationLocked=false;}
+    else {window.navigationLocked=true; currentImg.classList.add('zooming-page');}
     draw();
     e.preventDefault();
   });
 
-  // Only inspect the active page when the user starts interacting.
-  // No MutationObserver / polling: this avoids a feedback loop during every zoom frame.
   window.addEventListener('resize',()=>{ if(zoom===1) resetImage(); });
 })();
 </script>
