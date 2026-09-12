@@ -181,6 +181,37 @@ navChoice.onclick=e=>{if(e.target===navChoice)navChoice.classList.add('hide');};
 
 let startX=0,startY=0;
 let navigationLocked=false;
+// Fast-swipe safety: reset any zoom state immediately when the active
+// page changes, before the browser paints the newly selected page.
+let lastActivePage = -1;
+function resetZoomOnPageChangeFast(){
+  const active = book.querySelector('.page.active');
+  if(!active) return;
+  const current = [...book.querySelectorAll('.page')].indexOf(active);
+
+  if(lastActivePage !== -1 && current !== lastActivePage){
+    // Reset every zoom-related state synchronously.
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden','true');
+    zi.removeAttribute('src');
+    zi.style.transform='translate3d(0,0,0) scale(1)';
+    z=1; L=0; T=0;
+    img=null; idx=-1;
+    pinch=false;
+    pts.clear();
+    gestureMoved=false;
+    book.dataset.zoomed='0';
+    window.__kesupenNavLocked=false;
+    lock(false);
+  }
+  lastActivePage=current;
+}
+
+// Capture phase makes this run before normal bubble-phase gesture handlers.
+book.addEventListener('pointermove',resetZoomOnPageChangeFast,true);
+book.addEventListener('pointerup',resetZoomOnPageChangeFast,true);
+book.addEventListener('touchmove',resetZoomOnPageChangeFast,{capture:true,passive:true});
+
 book.addEventListener('pointerdown',e=>{
   if(e.pointerType==='touch' && e.isPrimary){ startX=e.clientX; startY=e.clientY; }
 });
@@ -562,6 +593,7 @@ new MutationObserver(()=>{
     window.__kesupenNavLocked=false;
     lock(false);
     zi.style.transform='translate3d(0,0,0) scale(1)';
+    lastActivePage = a ? a.idx : -1;
     return;
   }
 
