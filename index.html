@@ -441,7 +441,8 @@ function end(e){
 book.addEventListener('pointerup',end,{passive:false});
 book.addEventListener('pointercancel',end,{passive:false});
 
-// Double-tap zoom. This is independent of swipe state.
+// Double-tap zoom: 1x -> 2x -> 1x.
+// Keep this independent of swipe/navigation locking.
 let lastTap=0,tapX=0,tapY=0;
 book.addEventListener('pointerup',e=>{
   if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;
@@ -449,24 +450,46 @@ book.addEventListener('pointerup',e=>{
 
   const now=performance.now();
   const dx=e.clientX-tapX,dy=e.clientY-tapY;
+
   if(now-lastTap<320&&Math.hypot(dx,dy)<28){
     lastTap=0;
+
     const a=act(); if(!a)return;
-    if(!overlay.classList.contains('open'))open(a);
-    if(z>1.01){
-      close();
-    }else{
+
+    // First double-tap: open at 2x around the tap point.
+    if(z<=1.01){
+      if(!overlay.classList.contains('open'))open(a);
       setRect();
-      const q=cr,mx=e.clientX-q.left,my=e.clientY-q.top;
-      z=2; L=mx-(mx/cw)*cw*z; T=my-(my/ch)*ch*z;
-      clamp(); draw(); lock(true);
+
+      const q=cr;
+      const mx=e.clientX-q.left;
+      const my=e.clientY-q.top;
+
+      z=2;
+      L=mx-(mx/cw)*cw*z;
+      T=my-(my/ch)*ch;
+      clamp();
+      draw();
+      lock(true);
       gestureMoved=true;
     }
+    // Second double-tap: return to the original 1x view.
+    else{
+      z=1;
+      L=0;
+      T=0;
+      draw();
+      close();
+    }
+
     e.preventDefault();
     e.stopPropagation();
     return;
   }
-  lastTap=now; tapX=e.clientX; tapY=e.clientY;
+
+  lastTap=now;
+  tapX=e.clientX;
+  tapY=e.clientY;
 },{passive:false});
 
 book.addEventListener('wheel',e=>{
