@@ -283,47 +283,219 @@ window.addEventListener('load',()=>{
 </script>
 <script id="master-pinch-zoom-js">
 (function(){
-const book=document.getElementById('book'),overlay=document.getElementById('pageZoomOverlay'),zi=document.getElementById('pageZoomImage');if(!book||!overlay||!zi)return;
-const MAX=2;let img=null,idx=-1,z=1,L=0,T=0,pts=new Map(),pinch=false,raf=0,sd=1,sz=1,sl=0,st=0,sw=0,sh=0,ax=0,ay=0,psx=0,psy=0,pbl=0,pbt=0,lastTap=0,tapX=0,tapY=0,cw=0,ch=0,cr=null;
-function act(){const a=book.querySelector('.page.active');if(!a)return null;const i=[...book.querySelectorAll('.page')].indexOf(a);return i===10?null:{img:a,idx:i}}
+const book=document.getElementById('book'),overlay=document.getElementById('pageZoomOverlay'),zi=document.getElementById('pageZoomImage');
+if(!book||!overlay||!zi)return;
+
+const MAX=2;
+let img=null,idx=-1,z=1,L=0,T=0,pts=new Map(),pinch=false,raf=0;
+let sd=1,sz=1,ax=0,ay=0,psx=0,psy=0,pbl=0,pbt=0,cw=0,ch=0,cr=null;
+let gestureMoved=false;
+
+function act(){
+  const a=book.querySelector('.page.active');
+  if(!a)return null;
+  const i=[...book.querySelectorAll('.page')].indexOf(a);
+  return i===10?null:{img:a,idx:i};
+}
 function r(){return book.getBoundingClientRect()}
 function setRect(){cr=r();cw=cr.width;ch=cr.height}
-function clamp(){const W=cw*z,H=ch*z;L=W<=cw?(cw-W)/2:Math.max(cw-W,Math.min(0,L));T=H<=ch?(ch-H)/2:Math.max(ch-H,Math.min(0,T))}
-function draw(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;zi.style.transform=`translate3d(${L}px,${T}px,0) scale(${z})`})}
-function lock(v){window.__kesupenNavLocked=!!v;book.dataset.zoomed=v?'1':'0'}
-function open(a){img=a.img;idx=a.idx;zi.src=img.src;zi.alt=img.alt||'';setRect();L=0;T=0;z=1;overlay.classList.add('open');lock(true);draw()}
-function close(){overlay.classList.remove('open');zi.removeAttribute('src');img=null;idx=-1;z=1;L=T=0;pts.clear();pinch=false;lock(false);book.dataset.zoomed='0';window.__kesupenNavLocked=false;zi.style.transform='translate3d(0,0,0) scale(1)'}
-function pinchStart(a,b){const a0=act();if(!a0)return;if(!overlay.classList.contains('open'))open(a0);if(!cr)setRect();const x1=a.clientX-cr.left,y1=a.clientY-cr.top,x2=b.clientX-cr.left,y2=b.clientY-cr.top,mx=(x1+x2)/2,my=(y1+y2)/2;sd=Math.max(1,Math.hypot(x1-x2,y1-y2));sz=z;sl=L;st=T;sw=cw;sh=ch;ax=(mx-sl)/cw;ay=(my-st)/ch;pinch=true;lock(true);img.classList.add('zooming-page')}
-book.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;const a=act();if(!a)return;pts.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});if(z>1.01&&pts.size===1){lock(true);psx=e.clientX;psy=e.clientY;pbl=L;pbt=T;img.classList.add('zooming-page');e.preventDefault();return}if(pts.size===2){const v=[...pts.values()];pinchStart(v[0],v[1]);e.preventDefault()}},{passive:false});
-book.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'||!pts.has(e.pointerId)||!img)return;pts.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});if(pinch&&pts.size>=2){const v=[...pts.values()],x1=v[0].clientX-cr.left,y1=v[0].clientY-cr.top,x2=v[1].clientX-cr.left,y2=v[1].clientY-cr.top,d=Math.max(1,Math.hypot(x1-x2,y1-y2)),mx=(x1+x2)/2,my=(y1+y2)/2;z=Math.max(1,Math.min(MAX,sz*d/sd));L=mx-ax*(cw*z);T=my-ay*(ch*z);clamp();draw();if(z<=1.01){close();return}lock(true);e.preventDefault();return}if(!pinch&&pts.size===1&&z>1.01){L=pbl+(e.clientX-psx);T=pbt+(e.clientY-psy);clamp();draw();lock(true);e.preventDefault()}},{passive:false});
-function end(e){if(e.pointerType!=='touch')return;pts.delete(e.pointerId);if(pinch){if(pts.size===1){pinch=false;const p=[...pts.values()][0];psx=p.clientX;psy=p.clientY;pbl=L;pbt=T;if(z<=1.01){close();}else{lock(true);}}else if(!pts.size){pinch=false;if(z<=1.01){close();}else{lock(true)}}if(book.dataset.zoomed==='1')e.preventDefault();return}if(!pts.size&&z>1.01){lock(true);e.preventDefault();}else if(!pts.size){lock(false);window.__kesupenNavLocked=false;book.dataset.zoomed='0';navigationLocked=false}}
-book.addEventListener('pointerup',end,{passive:false});book.addEventListener('pointercancel',end,{passive:false});
-book.addEventListener('pointerup',e=>{
- if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;
- const now=performance.now(), dx=e.clientX-tapX, dy=e.clientY-tapY;
- if(now-lastTap<320 && Math.hypot(dx,dy)<28){
-   lastTap=0;
-   if(z>1.01 || overlay.classList.contains('open')){ close(); e.preventDefault(); e.stopPropagation(); return; }
- }
- lastTap=now; tapX=e.clientX; tapY=e.clientY;
+function clamp(){
+  const W=cw*z,H=ch*z;
+  L=W<=cw?(cw-W)/2:Math.max(cw-W,Math.min(0,L));
+  T=H<=ch?(ch-H)/2:Math.max(ch-H,Math.min(0,T));
+}
+function draw(){
+  if(raf)return;
+  raf=requestAnimationFrame(()=>{
+    raf=0;
+    zi.style.transform=`translate3d(${L}px,${T}px,0) scale(${z})`;
+  });
+}
+function lock(v){
+  window.__kesupenNavLocked=!!v;
+  book.dataset.zoomed=v?'1':'0';
+}
+function open(a){
+  img=a.img; idx=a.idx; zi.src=img.src; zi.alt=img.alt||'';
+  setRect(); L=0; T=0; z=1;
+  overlay.classList.add('open');
+  lock(true); draw();
+}
+function close(){
+  overlay.classList.remove('open');
+  zi.removeAttribute('src');
+  img=null; idx=-1; z=1; L=T=0;
+  pinch=false; gestureMoved=false;
+  lock(false);
+  book.dataset.zoomed='0';
+  window.__kesupenNavLocked=false;
+  zi.style.transform='translate3d(0,0,0) scale(1)';
+}
+function pinchStart(a,b){
+  const a0=act(); if(!a0)return;
+  if(!overlay.classList.contains('open'))open(a0);
+  setRect();
+  const x1=a.clientX-cr.left,y1=a.clientY-cr.top;
+  const x2=b.clientX-cr.left,y2=b.clientY-cr.top;
+  const mx=(x1+x2)/2,my=(y1+y2)/2;
+  sd=Math.max(1,Math.hypot(x1-x2,y1-y2));
+  sz=z;
+  ax=(mx-L)/(cw*z);
+  ay=(my-T)/(ch*z);
+  pinch=true; gestureMoved=true;
+  lock(true);
+  img.classList.add('zooming-page');
+}
+
+book.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;
+  const a=act(); if(!a)return;
+  pts.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});
+
+  if(pts.size===1){
+    psx=e.clientX; psy=e.clientY; pbl=L; pbt=T;
+    if(z>1.01){
+      gestureMoved=true;
+      lock(true);
+      img.classList.add('zooming-page');
+      e.preventDefault();
+    }
+  }else if(pts.size===2){
+    pinchStart(...[...pts.values()]);
+    e.preventDefault();
+  }
 },{passive:false});
-book.addEventListener('wheel',e=>{if(!e.deltaY)return;const a=act();if(!a)return;if(!overlay.classList.contains('open'))open(a);const q=r(),mx=e.clientX-q.left,my=e.clientY-q.top,cx=(mx-L)/(q.width*z),cy=(my-T)/(q.height*z);z=Math.max(1,Math.min(MAX,z*(e.deltaY<0?1.1:.91)));L=mx-cx*cw*z;T=my-cy*ch*z;clamp();draw();lock(z>1.01);if(z<=1.01)close();e.preventDefault()},{passive:false});
-book.addEventListener('dblclick',e=>{const a=act();if(!a||e.target.closest('#qrLink'))return;if(!overlay.classList.contains('open'))open(a);if(z>1.01){close();e.preventDefault();return}setRect();const q=cr,mx=e.clientX-q.left,my=e.clientY-q.top,cx=mx/cw,cy=my/ch;z=2;L=mx-cx*cw*z;T=my-cy*ch*z;clamp();draw();lock(true);e.preventDefault()});
-window.addEventListener('resize',()=>{if(z>1.01&&overlay.classList.contains('open')){const q=r();L=Math.min(0,Math.max(q.width-q.width*z,L));T=Math.min(0,Math.max(q.height-q.height*z,T));clamp();draw()}});
-new MutationObserver(()=>{const a=act();if(!a){if(overlay.classList.contains('open'))close();return}if(idx>=0&&a.idx!==idx)close()}).observe(book,{subtree:true,attributes:true,attributeFilter:['class']});
+
+book.addEventListener('pointermove',e=>{
+  if(e.pointerType!=='touch'||!pts.has(e.pointerId)||!img)return;
+  pts.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});
+
+  if(pinch&&pts.size>=2){
+    const v=[...pts.values()];
+    const x1=v[0].clientX-cr.left,y1=v[0].clientY-cr.top;
+    const x2=v[1].clientX-cr.left,y2=v[1].clientY-cr.top;
+    const d=Math.max(1,Math.hypot(x1-x2,y1-y2));
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+
+    z=Math.max(1,Math.min(MAX,sz*d/sd));
+    L=mx-ax*(cw*z);
+    T=my-ay*(ch*z);
+    clamp();
+    draw();
+    gestureMoved=true;
+    lock(true);
+    e.preventDefault();
+    return;
+  }
+
+  if(!pinch&&pts.size===1&&z>1.01){
+    L=pbl+(e.clientX-psx);
+    T=pbt+(e.clientY-psy);
+    clamp();
+    draw();
+    gestureMoved=true;
+    lock(true);
+    e.preventDefault();
+  }
+},{passive:false});
+
+function end(e){
+  if(e.pointerType!=='touch')return;
+  pts.delete(e.pointerId);
+
+  if(pinch){
+    if(pts.size===1){
+      pinch=false;
+      const p=[...pts.values()][0];
+      psx=p.clientX; psy=p.clientY; pbl=L; pbt=T;
+      if(z<=1.01){
+        // Do NOT close while a finger is still down.
+        z=1; L=0; T=0; draw();
+      }
+      lock(z>1.01);
+    }else if(pts.size===0){
+      pinch=false;
+      if(z<=1.01) close();
+      else lock(true);
+    }
+    e.preventDefault();
+    return;
+  }
+
+  if(pts.size===0){
+    if(z>1.01) lock(true);
+    else{
+      lock(false);
+      if(img && overlay.classList.contains('open') && gestureMoved) close();
+    }
+  }
+}
+book.addEventListener('pointerup',end,{passive:false});
+book.addEventListener('pointercancel',end,{passive:false});
+
+// Double-tap zoom. This is independent of swipe state.
+let lastTap=0,tapX=0,tapY=0;
+book.addEventListener('pointerup',e=>{
+  if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;
+  if(gestureMoved){ gestureMoved=false; lastTap=0; return; }
+
+  const now=performance.now();
+  const dx=e.clientX-tapX,dy=e.clientY-tapY;
+  if(now-lastTap<320&&Math.hypot(dx,dy)<28){
+    lastTap=0;
+    const a=act(); if(!a)return;
+    if(!overlay.classList.contains('open'))open(a);
+    if(z>1.01){
+      close();
+    }else{
+      setRect();
+      const q=cr,mx=e.clientX-q.left,my=e.clientY-q.top;
+      z=2; L=mx-(mx/cw)*cw*z; T=my-(my/ch)*ch*z;
+      clamp(); draw(); lock(true);
+      gestureMoved=true;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+  lastTap=now; tapX=e.clientX; tapY=e.clientY;
+},{passive:false});
+
+book.addEventListener('wheel',e=>{
+  if(!e.deltaY)return;
+  const a=act(); if(!a)return;
+  if(!overlay.classList.contains('open'))open(a);
+  const q=r(),mx=e.clientX-q.left,my=e.clientY-q.top;
+  const cx=(mx-L)/(q.width*z),cy=(my-T)/(q.height*z);
+  z=Math.max(1,Math.min(MAX,z*(e.deltaY<0?1.1:.91)));
+  L=mx-cx*cw*z; T=my-cy*ch*z; clamp(); draw();
+  if(z<=1.01)close(); else lock(true);
+  e.preventDefault();
+},{passive:false});
+
+book.addEventListener('dblclick',e=>{
+  const a=act(); if(!a||e.target.closest('#qrLink'))return;
+  if(!overlay.classList.contains('open'))open(a);
+  if(z>1.01){close();e.preventDefault();return}
+  setRect();
+  const q=cr,mx=e.clientX-q.left,my=e.clientY-q.top;
+  z=2;L=mx-(mx/cw)*cw*z;T=my-(my/ch)*ch*z;
+  clamp();draw();lock(true);e.preventDefault();
+});
+
+window.addEventListener('resize',()=>{
+  if(z>1.01&&overlay.classList.contains('open')){
+    setRect();clamp();draw();
+  }
+});
+
+new MutationObserver(()=>{
+  const a=act();
+  if(!a){if(overlay.classList.contains('open'))close();return}
+  if(idx>=0&&a.idx!==idx)close();
+}).observe(book,{subtree:true,attributes:true,attributeFilter:['class']});
 })();
 </script>
-<script id="gesture-guard-final">
-(function(){
- const book=document.getElementById('book'); if(!book)return;
- let active=false, count=0;
- function is11(){const a=book.querySelector('.page.active');return a&&[...book.querySelectorAll('.page')].indexOf(a)===10;}
- book.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'||is11())return;count++; if(window.__kesupenNavLocked||book.dataset.zoomed==='1'||count>=2){active=true;window.__kesupenNavLocked=true;e.preventDefault();}},true);
- book.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'||is11())return;if(active||window.__kesupenNavLocked||book.dataset.zoomed==='1'||count>=2){active=true;window.__kesupenNavLocked=true;e.preventDefault();}},true);
- book.addEventListener('pointerup',e=>{if(e.pointerType!=='touch'||is11())return;if(book.dataset.zoomed==='1'||active){e.preventDefault();}count=Math.max(0,count-1);setTimeout(()=>{if(count===0&&!book.dataset.zoomed){active=false;window.__kesupenNavLocked=false;}},0);},true);
- book.addEventListener('pointercancel',e=>{if(e.pointerType!=='touch')return;count=Math.max(0,count-1);if(count===0&&!book.dataset.zoomed){active=false;window.__kesupenNavLocked=false;}},true);
-  book.addEventListener('pointerup',e=>{if(e.pointerType==='touch'&&!book.dataset.zoomed&&count===0){active=false;window.__kesupenNavLocked=false;}},{passive:true});
-})();
-</script>
+
 </body>
 </html>
