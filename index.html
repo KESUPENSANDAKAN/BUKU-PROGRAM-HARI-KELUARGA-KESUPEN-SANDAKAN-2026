@@ -17,8 +17,8 @@ button{border:0;border-radius:10px;background:#fff;color:#07356f;padding:8px 11p
 button:disabled{opacity:.4}
 .count{font-size:13px;min-width:58px;text-align:center;font-weight:700}
 #stage{position:relative;flex:1;display:flex;align-items:center;justify-content:center;padding:10px 10px 68px;touch-action:none}
-#book{position:relative;height:min(100%,calc(100vw * 1.5));width:min(calc((100vh - 126px) * .6666667),calc(100vw - 20px));aspect-ratio:2/3;box-shadow:0 18px 55px rgba(0,0,0,.52);overflow:hidden;background:#000;border-radius:3px}
-.page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;opacity:0;transition:opacity .22s ease,transform .22s ease;transform:translateX(3%);user-select:none;-webkit-user-drag:none}
+#book{touch-action:none;position:relative;height:min(100%,calc(100vw * 1.5));width:min(calc((100vh - 126px) * .6666667),calc(100vw - 20px));aspect-ratio:2/3;box-shadow:0 18px 55px rgba(0,0,0,.52);overflow:hidden;background:#000;border-radius:3px}
+.page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;opacity:0;transition:opacity .22s ease;transform:translateX(3%);user-select:none;-webkit-user-drag:none}
 .page.active{opacity:1;transform:translateX(0)}
 #qrLink{position:absolute;z-index:3;display:none;left:14.2%;top:77.8%;width:20%;height:12%;border-radius:8px}
 #qrLink.show{display:block}
@@ -164,7 +164,7 @@ book.addEventListener('pointermove',e=>{
 });
 book.addEventListener('pointerup',e=>{
   if(e.pointerType!=='touch' || !e.isPrimary) return;
-  if(window.navigationLocked || gestureMoved) return;
+  if(navigationLocked || gestureMoved) return;
   const dx=e.clientX-startX, dy=e.clientY-startY;
   if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)) show(current+(dx<0?1:-1));
 });
@@ -287,7 +287,7 @@ window.addEventListener('load',()=>{
     currentImg=null; currentIndex=-1;
     zoom=1; tx=0; ty=0;
     points.clear(); pinch=false; gestureActive=false;
-    window.navigationLocked=false;
+    navigationLocked=false;
   }
 
   function sync(){
@@ -327,7 +327,7 @@ window.addEventListener('load',()=>{
   function beginPinch(a,b){
     sync();
     if(!currentImg) return;
-    pinch=true; gestureActive=true; window.navigationLocked=true;
+    pinch=true; gestureActive=true; navigationLocked=true;
     currentImg.classList.add('zooming-page');
     startDist=Math.max(1,dist(a,b));
     startZoom=zoom; startTx=tx; startTy=ty;
@@ -341,7 +341,7 @@ window.addEventListener('load',()=>{
     points.set(e.pointerId,e);
     if(zoom>1.01 && points.size===1){
       // One-finger pan is active only while this page is already zoomed.
-      window.navigationLocked=true;
+      navigationLocked=true;
       gestureActive=true;
       panStartX=e.clientX; panStartY=e.clientY;
       panBaseTx=tx; panBaseTy=ty;
@@ -379,7 +379,7 @@ window.addEventListener('load',()=>{
       tx=panBaseTx+dx;
       ty=panBaseTy+dy;
       clampPan();
-      window.navigationLocked=true;
+      navigationLocked=true;
       draw();
       e.preventDefault();
     }
@@ -395,9 +395,9 @@ window.addEventListener('load',()=>{
         const remaining=[...points.values()][0];
         panStartX=remaining.clientX; panStartY=remaining.clientY;
         panBaseTx=tx; panBaseTy=ty;
-        gestureActive=true; window.navigationLocked=true;
+        gestureActive=true; navigationLocked=true;
       } else if(points.size===0){
-        pinch=false; gestureActive=false; window.navigationLocked=false;
+        pinch=false; gestureActive=false; navigationLocked=false;
         if(zoom<=1.01){ zoom=1; tx=0; ty=0; draw(); }
       }
       e.preventDefault();
@@ -405,7 +405,7 @@ window.addEventListener('load',()=>{
     }
     if(points.size===0){
       gestureActive=false;
-      window.navigationLocked=false;
+      navigationLocked=false;
     }
   }
   book.addEventListener('pointerup',endPointer,{passive:false});
@@ -414,7 +414,7 @@ window.addEventListener('load',()=>{
   // If zoomed, keep navigation locked so a finishing finger cannot turn the page.
   book.addEventListener('touchstart',e=>{
     if(e.touches.length>1){
-      window.navigationLocked=true;
+      navigationLocked=true;
       e.preventDefault();
     }
   },{passive:false});
@@ -422,7 +422,7 @@ window.addEventListener('load',()=>{
     if(e.touches.length>1 || pinch || zoom>1.01) e.preventDefault();
   },{passive:false});
   book.addEventListener('touchend',()=>{
-    if(points.size===0 && !pinch) window.navigationLocked=false;
+    if(points.size===0 && !pinch) navigationLocked=false;
   },{passive:false});
 
   // Desktop wheel zoom.
@@ -431,11 +431,11 @@ window.addEventListener('load',()=>{
     sync();
     if(!currentImg) return;
     e.preventDefault();
-    window.navigationLocked=true;
+    navigationLocked=true;
     const factor=e.deltaY<0?1.10:0.91;
     zoom=Math.max(MIN,Math.min(MAX,zoom*factor));
     clampPan();
-    if(zoom===1){tx=0;ty=0;window.navigationLocked=false;}
+    if(zoom===1){tx=0;ty=0;navigationLocked=false;}
     currentImg.classList.add('zooming-page');
     draw();
   },{passive:false});
@@ -444,9 +444,8 @@ window.addEventListener('load',()=>{
     sync();
     if(!currentImg || e.target.closest('#qrLink')) return;
     zoom=zoom>1.01?1:2;
-    if(zoom===1){tx=0;ty=0;window.navigationLocked=false;}
-    else clampPan();
-    else {window.navigationLocked=true; currentImg.classList.add('zooming-page');}
+    if(zoom===1){tx=0;ty=0;navigationLocked=false;}
+    else { clampPan(); navigationLocked=true; currentImg.classList.add('zooming-page'); }
     draw();
     e.preventDefault();
   });
