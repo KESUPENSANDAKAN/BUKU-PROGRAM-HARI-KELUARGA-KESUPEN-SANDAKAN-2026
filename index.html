@@ -49,7 +49,7 @@ header{height:52px;flex-basis:52px;padding:0 9px}
 /* MASTER — SMOOTH FOCAL ZOOM (Pages 1-10 and 12 only). Page 11 remains untouched. */
 #pageZoomOverlay{position:absolute;inset:0;overflow:hidden;display:none;z-index:20;background:#000;touch-action:none;}
 #pageZoomOverlay.open{display:block}
-#pageZoomOverlay img{position:absolute;display:block;width:100%;height:100%;object-fit:cover;object-position:center;max-width:none;max-height:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;pointer-events:none;will-change:left,top,width,height;}
+#pageZoomOverlay img{position:absolute;left:0;top:0;display:block;width:100%;height:100%;object-fit:cover;object-position:center;max-width:none;max-height:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:0 0;will-change:transform;}
 .page.zooming-page{transition:none!important;user-select:none!important;-webkit-user-select:none!important;}
 </style>
 
@@ -248,80 +248,34 @@ window.addEventListener('load',()=>{
 <script id="master-pinch-zoom-js">
 (function(){
 const book=document.getElementById('book'),overlay=document.getElementById('pageZoomOverlay'),zi=document.getElementById('pageZoomImage');if(!book||!overlay||!zi)return;
-const MAX=3;let img=null,idx=-1,z=1,L=0,T=0,W=0,H=0,pts=new Map(),pinch=false,raf=0,sd=1,sz=1,sl=0,st=0,sw=0,sh=0,ax=0,ay=0,psx=0,psy=0,pbl=0,pbt=0;
+const MAX=3;let img=null,idx=-1,z=1,L=0,T=0,pts=new Map(),pinch=false,raf=0,sd=1,sz=1,sl=0,st=0,sw=0,sh=0,ax=0,ay=0,psx=0,psy=0,pbl=0,pbt=0;
 function act(){const a=book.querySelector('.page.active');if(!a)return null;const i=[...book.querySelectorAll('.page')].indexOf(a);return i===10?null:{img:a,idx:i}}
 function r(){return book.getBoundingClientRect()}
-function clamp(){const q=r();L=W<=q.width?(q.width-W)/2:Math.max(q.width-W,Math.min(0,L));T=H<=q.height?(q.height-H)/2:Math.max(q.height-H,Math.min(0,T))}
-function draw(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;zi.style.left=L+'px';zi.style.top=T+'px';zi.style.width=W+'px';zi.style.height=H+'px'})}
+function clamp(){const q=r(),W=q.width*z,H=q.height*z;L=W<=q.width?(q.width-W)/2:Math.max(q.width-W,Math.min(0,L));T=H<=q.height?(q.height-H)/2:Math.max(q.height-H,Math.min(0,T))}
+function draw(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;zi.style.transform=`translate3d(${L}px,${T}px,0) scale(${z})`})}
 function lock(v){window.__kesupenNavLocked=!!v;book.dataset.zoomed=v?'1':'0'}
-function open(a){img=a.img;idx=a.idx;zi.src=img.src;zi.alt=img.alt||'';const q=r();W=q.width;H=q.height;L=0;T=0;z=1;overlay.classList.add('open');lock(true);draw()}
-function close(){overlay.classList.remove('open');zi.removeAttribute('src');img=null;idx=-1;z=1;L=T=0;pts.clear();pinch=false;lock(false)}
-function pinchStart(a,b){const a0=act();if(!a0)return;if(!overlay.classList.contains('open'))open(a0);const q=r(),x1=a.clientX-q.left,y1=a.clientY-q.top,x2=b.clientX-q.left,y2=b.clientY-q.top,mx=(x1+x2)/2,my=(y1+y2)/2;sd=Math.max(1,Math.hypot(x1-x2,y1-y2));sz=z;sl=L;st=T;sw=W;sh=H;ax=(mx-sl)/sw;ay=(my-st)/sh;pinch=true;lock(true);img.classList.add('zooming-page')}
+function open(a){img=a.img;idx=a.idx;zi.src=img.src;zi.alt=img.alt||'';const q=r();L=0;T=0;z=1;overlay.classList.add('open');lock(true);draw()}
+function close(){overlay.classList.remove('open');zi.removeAttribute('src');img=null;idx=-1;z=1;L=T=0;pts.clear();pinch=false;lock(false);zi.style.transform='translate3d(0,0,0) scale(1)'}
+function pinchStart(a,b){const a0=act();if(!a0)return;if(!overlay.classList.contains('open'))open(a0);const q=r(),x1=a.clientX-q.left,y1=a.clientY-q.top,x2=b.clientX-q.left,y2=b.clientY-q.top,mx=(x1+x2)/2,my=(y1+y2)/2;sd=Math.max(1,Math.hypot(x1-x2,y1-y2));sz=z;sl=L;st=T;sw=q.width;sh=q.height;ax=(mx-sl)/(q.width);ay=(my-st)/(q.height);pinch=true;lock(true);img.classList.add('zooming-page')}
 book.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;const a=act();if(!a)return;pts.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});if(z>1.01&&pts.size===1){lock(true);psx=e.clientX;psy=e.clientY;pbl=L;pbt=T;img.classList.add('zooming-page');e.preventDefault();return}if(pts.size===2){const v=[...pts.values()];pinchStart(v[0],v[1]);e.preventDefault()}},{passive:false});
-book.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'||!pts.has(e.pointerId)||!img)return;pts.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});if(pinch&&pts.size>=2){const v=[...pts.values()],q=r(),x1=v[0].clientX-q.left,y1=v[0].clientY-q.top,x2=v[1].clientX-q.left,y2=v[1].clientY-q.top,d=Math.max(1,Math.hypot(x1-x2,y1-y2)),mx=(x1+x2)/2,my=(y1+y2)/2;z=Math.max(1,Math.min(MAX,sz*d/sd));W=q.width*z;H=q.height*z;L=mx-ax*W;T=my-ay*H;clamp();draw();lock(true);e.preventDefault();return}if(!pinch&&pts.size===1&&z>1.01){L=pbl+(e.clientX-psx);T=pbt+(e.clientY-psy);clamp();draw();lock(true);e.preventDefault()}},{passive:false});
+book.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'||!pts.has(e.pointerId)||!img)return;pts.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});if(pinch&&pts.size>=2){const v=[...pts.values()],q=r(),x1=v[0].clientX-q.left,y1=v[0].clientY-q.top,x2=v[1].clientX-q.left,y2=v[1].clientY-q.top,d=Math.max(1,Math.hypot(x1-x2,y1-y2)),mx=(x1+x2)/2,my=(y1+y2)/2;z=Math.max(1,Math.min(MAX,sz*d/sd));L=mx-ax*(q.width*z);T=my-ay*(q.height*z);clamp();draw();lock(true);e.preventDefault();return}if(!pinch&&pts.size===1&&z>1.01){L=pbl+(e.clientX-psx);T=pbt+(e.clientY-psy);clamp();draw();lock(true);e.preventDefault()}},{passive:false});
 function end(e){if(e.pointerType!=='touch')return;pts.delete(e.pointerId);if(pinch){if(pts.size===1){pinch=false;const p=[...pts.values()][0];psx=p.clientX;psy=p.clientY;pbl=L;pbt=T;lock(true)}else if(!pts.size){pinch=false;if(z<=1.01)close();else lock(true)}e.preventDefault();return}if(!pts.size&&z>1.01)lock(true)}
 book.addEventListener('pointerup',end,{passive:false});book.addEventListener('pointercancel',end,{passive:false});
-book.addEventListener('wheel',e=>{if(!e.deltaY)return;const a=act();if(!a)return;if(!overlay.classList.contains('open'))open(a);const q=r(),mx=e.clientX-q.left,my=e.clientY-q.top,cx=(mx-L)/W,cy=(my-T)/H;n=Math.max(1,Math.min(MAX,z*(e.deltaY<0?1.1:.91)));z=n;W=q.width*z;H=q.height*z;L=mx-cx*W;T=my-cy*H;clamp();draw();lock(z>1.01);if(z<=1.01)close();e.preventDefault()},{passive:false});
-book.addEventListener('dblclick',e=>{const a=act();if(!a||e.target.closest('#qrLink'))return;if(!overlay.classList.contains('open'))open(a);if(z>1.01){close();e.preventDefault();return}const q=r(),mx=e.clientX-q.left,my=e.clientY-q.top,cx=(mx-L)/W,cy=(my-T)/H;z=2;W=q.width*z;H=q.height*z;L=mx-cx*W;T=my-cy*H;clamp();draw();lock(true);e.preventDefault()});
-window.addEventListener('resize',()=>{if(z>1.01&&overlay.classList.contains('open')){const q=r(),cx=(L+W/2)/W,cy=(T+H/2)/H;W=q.width*z;H=q.height*z;L=cx*W-W/2;T=cy*H-H/2;clamp();draw()}});
+book.addEventListener('wheel',e=>{if(!e.deltaY)return;const a=act();if(!a)return;if(!overlay.classList.contains('open'))open(a);const q=r(),mx=e.clientX-q.left,my=e.clientY-q.top,cx=(mx-L)/(q.width*z),cy=(my-T)/(q.height*z);z=Math.max(1,Math.min(MAX,z*(e.deltaY<0?1.1:.91)));L=mx-cx*q.width*z;T=my-cy*q.height*z;clamp();draw();lock(z>1.01);if(z<=1.01)close();e.preventDefault()},{passive:false});
+book.addEventListener('dblclick',e=>{const a=act();if(!a||e.target.closest('#qrLink'))return;if(!overlay.classList.contains('open'))open(a);if(z>1.01){close();e.preventDefault();return}const q=r(),mx=e.clientX-q.left,my=e.clientY-q.top,cx=mx/q.width,cy=my/q.height;z=2;L=mx-cx*q.width*z;T=my-cy*q.height*z;clamp();draw();lock(true);e.preventDefault()});
+window.addEventListener('resize',()=>{if(z>1.01&&overlay.classList.contains('open')){const q=r();L=Math.min(0,Math.max(q.width-q.width*z,L));T=Math.min(0,Math.max(q.height-q.height*z,T));clamp();draw()}});
 new MutationObserver(()=>{const a=act();if(!a){if(overlay.classList.contains('open'))close();return}if(idx>=0&&a.idx!==idx)close()}).observe(book,{subtree:true,attributes:true,attributeFilter:['class']});
 })();
 </script>
 <script id="gesture-guard-final">
 (function(){
-  const book=document.getElementById('book');
-  if(!book) return;
-  let activeZoomed=false;
-  let touchCount=0;
-  let lockedGesture=false;
-  function page11(){ const a=book.querySelector('.page.active'); return a && [...book.querySelectorAll('.page')].indexOf(a)===10; }
-  function zoomed(){ return activeZoomed; }
-  // Keep the navigation layer informed BEFORE its bubble listeners run.
-  book.addEventListener('pointerdown', function(e){
-    if(e.pointerType!=='touch' || page11()) return;
-    touchCount++;
-    const active=book.querySelector('.page.active');
-    if(!active) return;
-    const idx=[...book.querySelectorAll('.page')].indexOf(active);
-    if(idx===10) return;
-    if(window.__kesupenNavLocked || activeZoomed || book.dataset.zoomed==='1' || touchCount>=2){
-      lockedGesture=true;
-      window.__kesupenNavLocked=true;
-      e.preventDefault();
-    }
-  }, true);
-  book.addEventListener('pointermove', function(e){
-    if(e.pointerType!=='touch' || page11()) return;
-    if(lockedGesture || window.__kesupenNavLocked || book.dataset.zoomed==='1' || touchCount>=2){
-      window.__kesupenNavLocked=true;
-      e.preventDefault();
-    }
-  }, true);
-  book.addEventListener('pointerup', function(e){
-    if(e.pointerType!=='touch' || page11()) return;
-    if(lockedGesture || touchCount>=2){
-      e.preventDefault();
-    }
-    touchCount=Math.max(0,touchCount-1);
-    if(touchCount===0){ lockedGesture=false; window.__kesupenNavLocked=false; }
-  }, true);
-  book.addEventListener('pointercancel', function(e){
-    if(e.pointerType!=='touch') return;
-    touchCount=Math.max(0,touchCount-1);
-    if(touchCount===0){ lockedGesture=false; window.__kesupenNavLocked=false; }
-  }, true);
-  // Track zoom state without interfering with Page 11.
-  const obs=new MutationObserver(function(){
-    const a=book.querySelector('.page.active');
-    const idx=a ? [...book.querySelectorAll('.page')].indexOf(a) : -1;
-    activeZoomed=idx!==10 && book.dataset.zoomed==='1';
-  });
-  obs.observe(book,{subtree:true,attributes:true,attributeFilter:['style','class']});
-  // Also expose a safe lock for the existing navigation code.
-  const originalShow=window.show;
-  if(typeof originalShow==='function'){
-    window.show=function(i){ if(window.__kesupenNavLocked) return; return originalShow(i); };
-  }
+ const book=document.getElementById('book'); if(!book)return;
+ let active=false, count=0;
+ function is11(){const a=book.querySelector('.page.active');return a&&[...book.querySelectorAll('.page')].indexOf(a)===10;}
+ book.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'||is11())return;count++; if(window.__kesupenNavLocked||book.dataset.zoomed==='1'||count>=2){active=true;window.__kesupenNavLocked=true;e.preventDefault();}},true);
+ book.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'||is11())return;if(active||window.__kesupenNavLocked||book.dataset.zoomed==='1'||count>=2){active=true;window.__kesupenNavLocked=true;e.preventDefault();}},true);
+ book.addEventListener('pointerup',e=>{if(e.pointerType!=='touch'||is11())return;if(active||book.dataset.zoomed==='1'){e.preventDefault();}count=Math.max(0,count-1);if(count===0&&!book.dataset.zoomed){active=false;window.__kesupenNavLocked=false;}},true);
+ book.addEventListener('pointercancel',e=>{if(e.pointerType!=='touch')return;count=Math.max(0,count-1);if(count===0&&!book.dataset.zoomed){active=false;window.__kesupenNavLocked=false;}},true);
 })();
 </script>
 </body>
