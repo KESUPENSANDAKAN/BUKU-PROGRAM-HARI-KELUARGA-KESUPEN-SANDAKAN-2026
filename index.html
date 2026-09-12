@@ -46,10 +46,16 @@ header{height:52px;flex-basis:52px;padding:0 9px}
 #book{width:min(calc(100vw - 14px),calc((100vh - 118px) * .6666667));height:auto;aspect-ratio:2/3}
 }
 
+@media(max-width:600px){
+  #book{box-shadow:0 8px 24px rgba(0,0,0,.42);}
+  #bar{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(3,20,43,.97);}
+  .page{transition:opacity .14s ease;}
+}
+
 /* MASTER — SMOOTH FOCAL ZOOM (Pages 1-10 and 12 only). Page 11 remains untouched. */
-#pageZoomOverlay{position:absolute;inset:0;overflow:hidden;display:none;z-index:20;background:#000;touch-action:none;}
+#pageZoomOverlay{position:absolute;inset:0;overflow:hidden;display:none;z-index:20;background:#000;touch-action:none;contain:strict;}
 #pageZoomOverlay.open{display:block}
-#pageZoomOverlay img{position:absolute;left:0;top:0;display:block;width:100%;height:100%;object-fit:cover;object-position:center;max-width:none;max-height:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:0 0;will-change:transform;}
+#pageZoomOverlay img{position:absolute;left:0;top:0;display:block;width:100%;height:100%;object-fit:cover;object-position:center;max-width:none;max-height:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:0 0;will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;}
 .page.zooming-page{transition:none!important;user-select:none!important;-webkit-user-select:none!important;}
 </style>
 
@@ -116,18 +122,48 @@ pages.forEach((src,i)=>{
   img.className='page';
   img.alt='Halaman '+(i+1)+' daripada '+total;
   img.draggable=false;
-  img.src=src;
+  img.dataset.src=src;
+  img.decoding="async";
+  img.loading="eager";
   book.appendChild(img);
 });
 
 const els=[...document.querySelectorAll('.page')];
 
+let loadToken=0;
+function loadPage(i){
+  if(i<0||i>=total) return;
+  const el=els[i];
+  if(!el.src) {
+    el.src=el.dataset.src;
+    el.dataset.loaded='1';
+  }
+}
+function schedulePageLoads(){
+  const token=++loadToken;
+  const targets=[current-1,current,current+1,current+2].filter(i=>i>=0&&i<total);
+  targets.forEach(loadPage);
+  const idle=window.requestIdleCallback||function(cb){setTimeout(cb,120)};
+  idle(()=>{
+    if(token!==loadToken) return;
+    els.forEach((el,i)=>{
+      if(Math.abs(i-current)>2 && i!==10) {
+        el.removeAttribute('src');
+        delete el.dataset.loaded;
+      }
+    });
+  },{timeout:500});
+}
 function show(n){
   current=Math.max(0,Math.min(total-1,n));
+  loadPage(current);
+  loadPage(current-1);
+  loadPage(current+1);
   els.forEach((el,i)=>el.classList.toggle('active',i===current));
   count.textContent=(current+1)+' / '+total;
   slider.value=current+1;
   qrLink.classList.toggle('show',current===8);
+  schedulePageLoads();
 }
 document.getElementById('prev').onclick=()=>show(current-1);
 document.getElementById('next').onclick=()=>show(current+1);
