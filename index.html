@@ -302,6 +302,20 @@ window.addEventListener('load',()=>{
   function dist(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
   function mid(a,b){return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}}
 
+  function clampPan(){
+    if(!currentImg) return;
+    // Keep the zoomed page inside its original page margins.
+    // The image is centered, so the maximum safe pan is half of the
+    // extra scaled size beyond the book viewport.
+    const bw=book.clientWidth, bh=book.clientHeight;
+    const iw=currentImg.offsetWidth || bw;
+    const ih=currentImg.offsetHeight || bh;
+    const maxX=Math.max(0,(iw*zoom-bw)/2);
+    const maxY=Math.max(0,(ih*zoom-bh)/2);
+    tx=Math.max(-maxX,Math.min(maxX,tx));
+    ty=Math.max(-maxY,Math.min(maxY,ty));
+  }
+
   function draw(){
     if(!currentImg || raf) return;
     raf=requestAnimationFrame(()=>{
@@ -354,6 +368,7 @@ window.addEventListener('load',()=>{
       zoom=Math.max(MIN,Math.min(MAX,startZoom*(d/startDist)));
       tx=startTx+(m.x-startMidX);
       ty=startTy+(m.y-startMidY);
+      clampPan();
       draw();
       e.preventDefault();
       return;
@@ -361,10 +376,9 @@ window.addEventListener('load',()=>{
     // One-finger pan while zoomed: never allow the flipbook swipe handler to see it.
     if(points.size===1 && zoom>1.01 && currentImg){
       const dx=e.clientX-panStartX, dy=e.clientY-panStartY;
-      const maxX=(book.clientWidth*(zoom-1))/2;
-      const maxY=(book.clientHeight*(zoom-1))/2;
-      tx=Math.max(-maxX,Math.min(maxX,panBaseTx+dx));
-      ty=Math.max(-maxY,Math.min(maxY,panBaseTy+dy));
+      tx=panBaseTx+dx;
+      ty=panBaseTy+dy;
+      clampPan();
       window.navigationLocked=true;
       draw();
       e.preventDefault();
@@ -420,6 +434,7 @@ window.addEventListener('load',()=>{
     window.navigationLocked=true;
     const factor=e.deltaY<0?1.10:0.91;
     zoom=Math.max(MIN,Math.min(MAX,zoom*factor));
+    clampPan();
     if(zoom===1){tx=0;ty=0;window.navigationLocked=false;}
     currentImg.classList.add('zooming-page');
     draw();
@@ -430,6 +445,7 @@ window.addEventListener('load',()=>{
     if(!currentImg || e.target.closest('#qrLink')) return;
     zoom=zoom>1.01?1:2;
     if(zoom===1){tx=0;ty=0;window.navigationLocked=false;}
+    else clampPan();
     else {window.navigationLocked=true; currentImg.classList.add('zooming-page');}
     draw();
     e.preventDefault();
