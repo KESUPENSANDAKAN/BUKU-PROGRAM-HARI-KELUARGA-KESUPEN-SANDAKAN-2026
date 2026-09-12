@@ -379,11 +379,16 @@ window.addEventListener('load',()=>{
       const nextZoom=Math.max(MIN,Math.min(MAX,startZoom*(d/startDist)));
       // Keep the exact content point under the pinch midpoint fixed.
       // With translate3d(...) scale(...), visual = content * zoom + translation.
-      const focalX=(startMidX-startTx)/Math.max(startZoom,0.0001);
-      const focalY=(startMidY-startTy)/Math.max(startZoom,0.0001);
+      // The page uses transform-origin:center center. Convert the screen
+      // pinch midpoint into coordinates relative to that center, then keep
+      // that exact content point under the moving pinch midpoint.
+      const cx=currentImg.getBoundingClientRect().left + currentImg.getBoundingClientRect().width/2;
+      const cy=currentImg.getBoundingClientRect().top + currentImg.getBoundingClientRect().height/2;
+      const focalX=(startMidX-cx-startTx)/Math.max(startZoom,0.0001);
+      const focalY=(startMidY-cy-startTy)/Math.max(startZoom,0.0001);
       zoom=nextZoom;
-      tx=m.x-(focalX*zoom);
-      ty=m.y-(focalY*zoom);
+      tx=(m.x-cx)-(focalX*zoom);
+      ty=(m.y-cy)-(focalY*zoom);
       clampPan();
       draw();
       e.preventDefault();
