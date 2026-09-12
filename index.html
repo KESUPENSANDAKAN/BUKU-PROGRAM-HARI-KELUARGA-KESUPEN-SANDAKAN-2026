@@ -284,7 +284,7 @@ window.addEventListener('load',()=>{
 <script id="master-pinch-zoom-js">
 (function(){
 const book=document.getElementById('book'),overlay=document.getElementById('pageZoomOverlay'),zi=document.getElementById('pageZoomImage');if(!book||!overlay||!zi)return;
-const MAX=3;let img=null,idx=-1,z=1,L=0,T=0,pts=new Map(),pinch=false,raf=0,sd=1,sz=1,sl=0,st=0,sw=0,sh=0,ax=0,ay=0,psx=0,psy=0,pbl=0,pbt=0,lastTap=0,tapX=0,tapY=0,cw=0,ch=0,cr=null;
+const MAX=2;let img=null,idx=-1,z=1,L=0,T=0,pts=new Map(),pinch=false,raf=0,sd=1,sz=1,sl=0,st=0,sw=0,sh=0,ax=0,ay=0,psx=0,psy=0,pbl=0,pbt=0,lastTap=0,tapX=0,tapY=0,cw=0,ch=0,cr=null;
 function act(){const a=book.querySelector('.page.active');if(!a)return null;const i=[...book.querySelectorAll('.page')].indexOf(a);return i===10?null:{img:a,idx:i}}
 function r(){return book.getBoundingClientRect()}
 function setRect(){cr=r();cw=cr.width;ch=cr.height}
