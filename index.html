@@ -264,6 +264,7 @@ window.addEventListener('load',()=>{
   const MAX=3, MIN=1;
   let currentImg=null, currentIndex=-1;
   let zoom=1, tx=0, ty=0;
+  let panStartX=0, panStartY=0, panBaseTx=0, panBaseTy=0;
   let points=new Map();
   let pinch=false, gestureActive=false;
   let startDist=0, startZoom=1, startTx=0, startTy=0;
@@ -324,6 +325,16 @@ window.addEventListener('load',()=>{
     if(e.target.closest('#qrLink') || e.target.closest('button')) return;
     sync();
     points.set(e.pointerId,e);
+    if(zoom>1.01 && points.size===1){
+      // One-finger pan is active only while this page is already zoomed.
+      window.navigationLocked=true;
+      gestureActive=true;
+      panStartX=e.clientX; panStartY=e.clientY;
+      panBaseTx=tx; panBaseTy=ty;
+      currentImg.classList.add('zooming-page');
+      e.preventDefault();
+      return;
+    }
     if(points.size===2){
       const arr=[...points.values()];
       beginPinch(arr[0],arr[1]);
@@ -336,14 +347,28 @@ window.addEventListener('load',()=>{
     points.set(e.pointerId,e);
     if(!pinch || points.size<2 || !currentImg) return;
 
-    const arr=[...points.values()];
-    const d=dist(arr[0],arr[1]);
-    const m=mid(arr[0],arr[1]);
-    zoom=Math.max(MIN,Math.min(MAX,startZoom*(d/startDist)));
-    tx=startTx+(m.x-startMidX);
-    ty=startTy+(m.y-startMidY);
-    draw();
-    e.preventDefault();
+    if(pinch && points.size>=2){
+      const arr=[...points.values()];
+      const d=dist(arr[0],arr[1]);
+      const m=mid(arr[0],arr[1]);
+      zoom=Math.max(MIN,Math.min(MAX,startZoom*(d/startDist)));
+      tx=startTx+(m.x-startMidX);
+      ty=startTy+(m.y-startMidY);
+      draw();
+      e.preventDefault();
+      return;
+    }
+    // One-finger pan while zoomed: never allow the flipbook swipe handler to see it.
+    if(points.size===1 && zoom>1.01 && currentImg){
+      const dx=e.clientX-panStartX, dy=e.clientY-panStartY;
+      const maxX=(book.clientWidth*(zoom-1))/2;
+      const maxY=(book.clientHeight*(zoom-1))/2;
+      tx=Math.max(-maxX,Math.min(maxX,panBaseTx+dx));
+      ty=Math.max(-maxY,Math.min(maxY,panBaseTy+dy));
+      window.navigationLocked=true;
+      draw();
+      e.preventDefault();
+    }
   },{passive:false});
 
   function endPointer(e){
@@ -351,7 +376,13 @@ window.addEventListener('load',()=>{
     points.delete(e.pointerId);
     if(pinch){
       // Once a pinch starts, navigation stays locked until ALL touch points are released.
-      if(points.size===0){
+      if(points.size===1){
+        pinch=false;
+        const remaining=[...points.values()][0];
+        panStartX=remaining.clientX; panStartY=remaining.clientY;
+        panBaseTx=tx; panBaseTy=ty;
+        gestureActive=true; window.navigationLocked=true;
+      } else if(points.size===0){
         pinch=false; gestureActive=false; window.navigationLocked=false;
         if(zoom<=1.01){ zoom=1; tx=0; ty=0; draw(); }
       }
