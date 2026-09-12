@@ -240,7 +240,15 @@ window.addEventListener('load',()=>{
  function findPage11(){
    const imgs=[...book.querySelectorAll('img')];
    return imgs.find(img=>{
-     if(img.src!==target) return false;
+     // Page 11 is displayed from pages/page11.jpg.
+     // The Simple Zoom modal itself opens the original 4K file.
+     const src=img.getAttribute('src') || '';
+     const isPage11 =
+       src === 'pages/page11.jpg' ||
+       src.endsWith('/pages/page11.jpg') ||
+       img.src.endsWith('/pages/page11.jpg');
+     if(!isPage11) return false;
+
      const r=img.getBoundingClientRect();
      const s=getComputedStyle(img);
      return r.width>50 && r.height>50 && s.display!=='none' &&
