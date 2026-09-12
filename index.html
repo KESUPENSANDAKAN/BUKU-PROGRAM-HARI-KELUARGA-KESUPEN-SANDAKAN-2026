@@ -442,77 +442,79 @@ book.addEventListener('pointerup',end,{passive:false});
 book.addEventListener('pointercancel',end,{passive:false});
 
 // Double-tap zoom: 1x -> 2x -> 1x.
-// The zoom focal point follows the exact touch position.
+// Uses a dedicated tap detector so the second double-tap is not swallowed
+// by the generic gestureMoved state.
 let lastTap=0,tapX=0,tapY=0;
 
 book.addEventListener('pointerup',e=>{
   if(e.pointerType!=='touch'||e.target.closest('#qrLink')||e.target.closest('button'))return;
 
-  if(gestureMoved){
-    gestureMoved=false;
-    lastTap=0;
-    return;
-  }
-
   const now=performance.now();
   const dx=e.clientX-tapX;
   const dy=e.clientY-tapY;
+  const isDouble=lastTap>0 && (now-lastTap)<420 && Math.hypot(dx,dy)<40;
 
-  if(now-lastTap<360&&Math.hypot(dx,dy)<35){
-    lastTap=0;
-
-    const a=act();
-    if(!a)return;
-
-    // Always calculate the focal point from the actual touch position.
-    setRect();
-    const mx=e.clientX-cr.left;
-    const my=e.clientY-cr.top;
-
-    if(z<=1.01){
-      // 1x -> 2x
-      if(!overlay.classList.contains('open'))open(a);
-      setRect();
-
-      const fx=e.clientX-cr.left;
-      const fy=e.clientY-cr.top;
-
-      z=2;
-      L=fx-(fx/cw)*(cw*z);
-      T=fy-(fy/ch)*(ch*z);
-      clamp();
-      draw();
-      lock(true);
-      gestureMoved=true;
-    }else{
-      // 2x -> 1x
-      z=1;
-      L=0;
-      T=0;
-      draw();
-
-      // Reset the zoom state, but keep the current touch gesture clean.
-      overlay.classList.remove('open');
-      zi.removeAttribute('src');
-      img=null;
-      idx=-1;
-      pinch=false;
-      pts.clear();
-      gestureMoved=false;
-      lock(false);
-      book.dataset.zoomed='0';
-      window.__kesupenNavLocked=false;
-      zi.style.transform='translate3d(0,0,0) scale(1)';
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
+  if(!isDouble){
+    lastTap=now;
+    tapX=e.clientX;
+    tapY=e.clientY;
     return;
   }
 
-  lastTap=now;
-  tapX=e.clientX;
-  tapY=e.clientY;
+  // Consume this double-tap completely.
+  lastTap=0;
+
+  const a=act();
+  if(!a)return;
+
+  // Double-tap out: force a complete 1x reset.
+  // Do this before any generic gesture cleanup can interfere.
+  if(z>1.01 || overlay.classList.contains('open')){
+    z=1;
+    L=0;
+    T=0;
+    pinch=false;
+    pts.clear();
+
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden','true');
+    zi.removeAttribute('src');
+    zi.style.transform='translate3d(0,0,0) scale(1)';
+
+    img=null;
+    idx=-1;
+
+    book.dataset.zoomed='0';
+    window.__kesupenNavLocked=false;
+    lock(false);
+
+    gestureMoved=false;
+    draw();
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+
+  // Double-tap in: open at 2x and keep the touched point fixed.
+  if(!overlay.classList.contains('open'))open(a);
+  setRect();
+
+  const fx=e.clientX-cr.left;
+  const fy=e.clientY-cr.top;
+
+  z=2;
+  L=fx-(fx/cw)*(cw*z);
+  T=fy-(fy/ch)*(ch*z);
+  clamp();
+  draw();
+  lock(true);
+
+  // Do not leave this flag set, otherwise the next double-tap can be blocked.
+  gestureMoved=false;
+
+  e.preventDefault();
+  e.stopImmediatePropagation();
 },{passive:false});
 
 book.addEventListener('wheel',e=>{
