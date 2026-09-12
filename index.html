@@ -28,6 +28,15 @@ button:disabled{opacity:.4}
 .hint{font-size:11px;opacity:.75;text-align:center;padding:0 8px}
 #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#061a32;z-index:10;font-weight:800}
 .hide{display:none!important}
+#qrLink{position:absolute;z-index:3;display:none;left:14.2%;top:77.8%;width:20%;height:12%;border-radius:8px;background:transparent;border:0;cursor:pointer;padding:0}
+#qrLink.show{display:block}
+#navChoice{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.58);padding:20px}
+#navChoice.hide{display:none!important}
+.navCard{width:min(390px,100%);background:#fff;color:#07356f;border-radius:20px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.45);text-align:center}
+.navTitle{font-size:21px;font-weight:900;margin-bottom:5px}.navSub{font-size:14px;opacity:.75;margin-bottom:18px}
+.navBtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.navBtn{display:flex;align-items:center;justify-content:center;min-height:54px;border-radius:13px;text-decoration:none;font-weight:900;font-size:15px;background:#eaf2ff;color:#1257a6}
+.navClose{margin-top:13px;width:100%;background:#07356f;color:#fff;border:0;border-radius:10px;padding:10px;font-weight:800}
 @media(max-width:600px){
 header{height:52px;flex-basis:52px;padding:0 9px}
 .title{font-size:11px}
@@ -52,7 +61,15 @@ header{height:52px;flex-basis:52px;padding:0 9px}
 <main id="stage">
 <div id="loading">Memuatkan ebook…</div>
 <div id="book" aria-live="polite">
-<a id="qrLink" href="https://www.google.com/maps/dir/?api=1&destination=5.994123%2C117.909835&travelmode=driving" target="_blank" rel="noopener" aria-label="Buka laluan Google Maps ke Pantai Dandulit"></a>
+<button id="qrLink" type="button" aria-label="Pilih aplikasi navigasi"></button>
+<div id="navChoice" class="hide" role="dialog" aria-modal="true">
+<div class="navCard"><div class="navTitle">📍 PILIH NAVIGASI</div>
+<div class="navSub">Pantai Dandulit, Sandakan</div>
+<div class="navBtns">
+<a class="navBtn" href="https://www.google.com/maps/dir/?api=1&destination=5.994123%2C117.909835&travelmode=driving" target="_blank" rel="noopener">🗺️ Google Maps</a>
+<a class="navBtn" href="https://waze.com/ul?ll=5.994123%2C117.909835&navigate=yes" target="_blank" rel="noopener">🚗 Waze</a>
+</div>
+<button id="navClose" class="navClose" type="button">Tutup</button></div></div>
 </div>
 <div id="bar">
 <div class="hint">Swipe kiri/kanan • ← → • klik butang</div>
@@ -95,6 +112,12 @@ document.getElementById('fs').onclick=()=>{
   if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
   else document.exitFullscreen?.();
 };
+const navChoice=document.getElementById('navChoice');
+const navClose=document.getElementById('navClose');
+qrLink.onclick=()=>navChoice.classList.remove('hide');
+navClose.onclick=()=>navChoice.classList.add('hide');
+navChoice.onclick=e=>{if(e.target===navChoice)navChoice.classList.add('hide');};
+
 
 let startX=0,startY=0;
 book.addEventListener('pointerdown',e=>{startX=e.clientX;startY=e.clientY;});
