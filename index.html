@@ -376,9 +376,14 @@ window.addEventListener('load',()=>{
       const arr=[...points.values()];
       const d=dist(arr[0],arr[1]);
       const m=mid(arr[0],arr[1]);
-      zoom=Math.max(MIN,Math.min(MAX,startZoom*(d/startDist)));
-      tx=startTx+(m.x-startMidX);
-      ty=startTy+(m.y-startMidY);
+      const nextZoom=Math.max(MIN,Math.min(MAX,startZoom*(d/startDist)));
+      // Keep the exact content point under the pinch midpoint fixed.
+      // With translate3d(...) scale(...), visual = content * zoom + translation.
+      const focalX=(startMidX-startTx)/Math.max(startZoom,0.0001);
+      const focalY=(startMidY-startTy)/Math.max(startZoom,0.0001);
+      zoom=nextZoom;
+      tx=m.x-(focalX*zoom);
+      ty=m.y-(focalY*zoom);
       clampPan();
       draw();
       e.preventDefault();
