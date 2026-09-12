@@ -150,21 +150,15 @@ navChoice.onclick=e=>{if(e.target===navChoice)navChoice.classList.add('hide');};
 
 let startX=0,startY=0;
 let navigationLocked=false;
-let gestureMoved=false;
 book.addEventListener('pointerdown',e=>{
-  if(e.pointerType==='touch' && e.isPrimary){
-    startX=e.clientX; startY=e.clientY;
-    gestureMoved=false;
-  }
-});
-book.addEventListener('pointermove',e=>{
-  if(e.pointerType==='touch' && e.isPrimary){
-    if(Math.abs(e.clientX-startX)>8 || Math.abs(e.clientY-startY)>8) gestureMoved=true;
-  }
+  if(e.pointerType==='touch' && e.isPrimary){ startX=e.clientX; startY=e.clientY; }
 });
 book.addEventListener('pointerup',e=>{
   if(e.pointerType!=='touch' || !e.isPrimary) return;
-  if(navigationLocked || window.__kesupenNavLocked || gestureMoved) return;
+  if(navigationLocked || window.__kesupenNavLocked) return;
+  const active=book.querySelector('.page.active');
+  const idx=active ? [...book.querySelectorAll('.page')].indexOf(active) : current;
+  // Page 11 keeps its existing Simple Zoom; normal swipe remains available.
   const dx=e.clientX-startX, dy=e.clientY-startY;
   if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)) show(current+(dx<0?1:-1));
 });
