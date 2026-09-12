@@ -45,6 +45,17 @@ header{height:52px;flex-basis:52px;padding:0 9px}
 #stage{padding:7px 7px 59px}
 #book{width:min(calc(100vw - 14px),calc((100vh - 118px) * .6666667));height:auto;aspect-ratio:2/3}
 }
+
+/* MASTER PINCH & ZOOM — Pages 1-10 and 12 only. Page 11 remains untouched. */
+.zooming-page {
+  touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+.zooming-page img {
+  transform-origin: center center !important;
+  will-change: transform;
+}
 </style>
 
 <style id="page11-center-css">
@@ -228,6 +239,78 @@ window.addEventListener('load',()=>{
  setInterval(position,250);
  setTimeout(position,300);
  setTimeout(position,1000);
+})();
+</script>
+<script id="master-pinch-zoom-js">
+(function(){
+  const stage=document.getElementById('stage');
+  const book=document.getElementById('book');
+  if(!stage||!book) return;
+  let zoom=1, tx=0, ty=0, startDist=0, startZoom=1, startTx=0, startTy=0, startMid=null;
+  let active=false, currentImg=null, currentIndex=-1;
+  const MAX=3, MIN=1;
+  function getIndex(){
+    const imgs=[...book.querySelectorAll('img')];
+    for(let i=0;i<imgs.length;i++){
+      const r=imgs[i].getBoundingClientRect();
+      const st=getComputedStyle(imgs[i]);
+      if(r.width>50 && r.height>50 && st.display!=='none' && st.visibility!=='hidden' && st.opacity!=='0') return i;
+    }
+    return -1;
+  }
+  function target(){
+    const i=getIndex();
+    if(i===10) return null; // Page 11 excluded completely.
+    const imgs=[...book.querySelectorAll('img')];
+    return imgs[i]||null;
+  }
+  function apply(){
+    if(!currentImg) return;
+    currentImg.classList.add('zooming-page');
+    currentImg.style.transform=`translate3d(${tx}px,${ty}px,0) scale(${zoom})`;
+  }
+  function reset(){
+    if(currentImg){currentImg.style.transform=''; currentImg.classList.remove('zooming-page');}
+    zoom=1;tx=0;ty=0;currentImg=null;currentIndex=-1;
+  }
+  function sync(){
+    const i=getIndex();
+    if(i!==currentIndex){ reset(); currentIndex=i; currentImg=target(); }
+  }
+  function dist(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
+  function mid(a,b){return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}}
+  stage.addEventListener('touchstart',e=>{
+    sync();
+    if(!currentImg || e.touches.length!==2) return;
+    active=true; startDist=dist(e.touches[0],e.touches[1]); startZoom=zoom;
+    startTx=tx; startTy=ty; startMid=mid(e.touches[0],e.touches[1]);
+    e.preventDefault();
+  },{passive:false});
+  stage.addEventListener('touchmove',e=>{
+    if(!active || !currentImg || e.touches.length<2) return;
+    const d=dist(e.touches[0],e.touches[1]);
+    zoom=Math.max(MIN,Math.min(MAX,startZoom*(d/startDist)));
+    const m=mid(e.touches[0],e.touches[1]);
+    tx=startTx+(m.x-startMid.x); ty=startTy+(m.y-startMid.y);
+    apply(); e.preventDefault();
+  },{passive:false});
+  stage.addEventListener('touchend',e=>{ if(active){active=false; if(zoom<=1.01){zoom=1;tx=0;ty=0;apply();} } },{passive:false});
+  stage.addEventListener('touchcancel',()=>{active=false;},{passive:true});
+  // Desktop wheel zoom over Pages 1-10 and 12; Page 11 is excluded.
+  stage.addEventListener('wheel',e=>{
+    sync(); if(!currentImg || e.ctrlKey===false) return;
+    e.preventDefault();
+    const factor=e.deltaY<0?1.12:0.89;
+    zoom=Math.max(MIN,Math.min(MAX,zoom*factor)); apply();
+  },{passive:false});
+  // Double-click desktop toggle.
+  stage.addEventListener('dblclick',e=>{
+    sync(); if(!currentImg) return;
+    zoom=zoom>1.01?1:2; if(zoom===1){tx=0;ty=0;} apply(); e.preventDefault();
+  });
+  // Keep in sync with page turns.
+  new MutationObserver(()=>setTimeout(sync,20)).observe(book,{childList:true,subtree:true,attributes:true});
+  setInterval(sync,150);
 })();
 </script>
 </body>
