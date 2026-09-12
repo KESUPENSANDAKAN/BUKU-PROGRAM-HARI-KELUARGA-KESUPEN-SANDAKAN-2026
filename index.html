@@ -155,6 +155,11 @@ function schedulePageLoads(){
   },{timeout:500});
 }
 function show(n){
+  // A page transition must always start from a clean 1x zoom state.
+  // Reset synchronously BEFORE changing the active page, which prevents
+  // very fast swipes from carrying the previous page's zoom into the next one.
+  window.__kesupenResetZoom?.();
+
   current=Math.max(0,Math.min(total-1,n));
   loadPage(current);
   loadPage(current-1);
@@ -370,6 +375,21 @@ function close(){
   window.__kesupenNavLocked=false;
   zi.style.transform='translate3d(0,0,0) scale(1)';
 }
+
+// Publicly expose only the reset action needed by the page navigator.
+// This does not change any zoom behavior; it guarantees page transitions
+// reset the current zoom synchronously, even during an extremely fast swipe.
+window.__kesupenResetZoom=function(){
+  close();
+  pts.clear();
+  pinch=false;
+  z=1;
+  L=0;
+  T=0;
+  gestureMoved=false;
+  book.dataset.zoomed='0';
+  window.__kesupenNavLocked=false;
+};
 function pinchStart(a,b){
   const a0=act(); if(!a0)return;
   if(!overlay.classList.contains('open'))open(a0);
