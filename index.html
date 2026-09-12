@@ -353,7 +353,24 @@ window.addEventListener('load',()=>{
   book.addEventListener('pointermove',e=>{
     if(e.pointerType!=='touch' || !points.has(e.pointerId)) return;
     points.set(e.pointerId,e);
-    if(!pinch || points.size<2 || !currentImg) return;
+    if(!currentImg) return;
+
+    // One-finger pan has priority whenever the page is already zoomed.
+    // This must run before the pinch guard; otherwise the old early-return
+    // prevents pan from ever receiving pointermove events.
+    if(!pinch && points.size===1 && zoom>1.01){
+      const dx=e.clientX-panStartX, dy=e.clientY-panStartY;
+      tx=panBaseTx+dx;
+      ty=panBaseTy+dy;
+      clampPan();
+      navigationLocked=true;
+      gestureActive=true;
+      draw();
+      e.preventDefault();
+      return;
+    }
+
+    if(!pinch || points.size<2) return;
 
     if(pinch && points.size>=2){
       const arr=[...points.values()];
@@ -366,16 +383,6 @@ window.addEventListener('load',()=>{
       draw();
       e.preventDefault();
       return;
-    }
-    // One-finger pan while zoomed: never allow the flipbook swipe handler to see it.
-    if(points.size===1 && zoom>1.01 && currentImg){
-      const dx=e.clientX-panStartX, dy=e.clientY-panStartY;
-      tx=panBaseTx+dx;
-      ty=panBaseTy+dy;
-      clampPan();
-      navigationLocked=true;
-      draw();
-      e.preventDefault();
     }
   },{passive:false});
 
